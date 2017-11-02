@@ -1,52 +1,76 @@
 package ru.javaops.masterjava.matrix;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 /**
  * gkislin
  * 03.07.2016
  */
 public class MainMatrix {
+    // Multiplex matrix
     private static final int MATRIX_SIZE = 1000;
     private static final int THREAD_NUMBER = 10;
 
-    private final static ExecutorService executor = Executors.newFixedThreadPool(MainMatrix.THREAD_NUMBER);
+    public static void main(String[] args) {
+        final int[][] matrixA = new int[MATRIX_SIZE][MATRIX_SIZE];
+        final int[][] matrixB = new int[MATRIX_SIZE][MATRIX_SIZE];
 
-    public static void main(String[] args) throws ExecutionException, InterruptedException {
-        final int[][] matrixA = MatrixUtil.create(MATRIX_SIZE);
-        final int[][] matrixB = MatrixUtil.create(MATRIX_SIZE);
+        MatrixUtil.randomFillMatrix(matrixA);
+        MatrixUtil.randomFillMatrix(matrixB);
 
-        double singleThreadSum = 0.;
-        double concurrentThreadSum = 0.;
-        int count = 1;
-        while (count < 6) {
-            System.out.println("Pass " + count);
-            long start = System.currentTimeMillis();
-            final int[][] matrixC = MatrixUtil.singleThreadMultiply(matrixA, matrixB);
-            double duration = (System.currentTimeMillis() - start) / 1000.;
-            out("Single thread time, sec: %.3f", duration);
-            singleThreadSum += duration;
+        long start = System.currentTimeMillis();
+        final int[][] matrixC =  MatrixUtil.singleThreadMultiply(matrixA, matrixB);
+        System.out.println("Single thread multiplication time, sec: " + (System.currentTimeMillis() - start)/1000.);
 
-            start = System.currentTimeMillis();
-            final int[][] concurrentMatrixC = MatrixUtil.concurrentMultiply(matrixA, matrixB, executor);
-            duration = (System.currentTimeMillis() - start) / 1000.;
-            out("Concurrent thread time, sec: %.3f", duration);
-            concurrentThreadSum += duration;
+        // TODO implement parallel multiplication matrixA*matrixB
+        // TODO compare wih matrixC;
 
-            if (!MatrixUtil.compare(matrixC, concurrentMatrixC)) {
-                System.err.println("Comparison failed");
-                break;
-            }
-            count++;
-        }
-        executor.shutdown();
-        out("\nAverage single thread time, sec: %.3f", singleThreadSum / 5.);
-        out("Average concurrent thread time, sec: %.3f", concurrentThreadSum / 5.);
+        start = System.currentTimeMillis();
+        final int[][] matrixD = MatrixUtil.multiThreadsMultiply(matrixA, matrixB, THREAD_NUMBER, 0);
+        System.out.println("Multi thread multiplication time, sec: " + (System.currentTimeMillis() - start)/1000.);
+        System.out.println("Matrixes are equals=" + checkMatrixEquals(matrixC, matrixD));
+
+        start = System.currentTimeMillis();
+        final int[][] matrixE = MatrixUtil.multiThreadsMultiply(matrixA, matrixB, THREAD_NUMBER, 1);
+        System.out.println("Multi thread multiplication time, sec: " + (System.currentTimeMillis() - start)/1000.);
+        System.out.println("Matrixes are equals=" + checkMatrixEquals(matrixC, matrixE));
     }
 
-    private static void out(String format, double ms) {
-        System.out.println(String.format(format, ms));
+    private static boolean checkMatrixEquals(final int[][] matrixA, final int[][] matrixB) {
+
+        for (int i = 0; i < MATRIX_SIZE; i++) {
+            for (int j = 0; j < MATRIX_SIZE; j++) {
+                if (matrixA[i][j] != matrixB[i][j]) {
+                    System.out.printf("Not equals in raw=%d, column=%d | in MatrixC[%d][%d]=%d, in MatrixD[%d][%d]=%d\n",
+                            i, j, i, j, i, j, matrixA[i][j], matrixB[i][j]);
+
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static void printMatrix(final int[][] matrix) {
+        /*
+        for (int i = 0; i < MATRIX_SIZE; i++) {
+            System.out.printf("[%d]   ", i);
+
+            for (int j = 0; j < MATRIX_SIZE; j++) {
+                System.out.printf("%d ", matrixC[i][j]);
+            }
+            System.out.println();
+        }
+
+        System.out.println();
+
+        for (int i = 0; i < MATRIX_SIZE; i++) {
+            System.out.printf("[%d]   ", i);
+
+            for (int j = 0; j < MATRIX_SIZE; j++) {
+                System.out.printf("%d ", matrixD[i][j]);
+            }
+            System.out.println();
+        }
+        */
     }
 }

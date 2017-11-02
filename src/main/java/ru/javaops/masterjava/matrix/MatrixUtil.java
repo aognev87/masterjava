@@ -1,8 +1,6 @@
 package ru.javaops.masterjava.matrix;
 
-import java.util.Random;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 
 /**
  * gkislin
@@ -10,15 +8,17 @@ import java.util.concurrent.ExecutorService;
  */
 public class MatrixUtil {
 
-    // TODO implement parallel multiplication matrixA*matrixB
-    public static int[][] concurrentMultiply(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
-        final int matrixSize = matrixA.length;
-        final int[][] matrixC = new int[matrixSize][matrixSize];
+    private final static Object LOCK = new Object();
 
-        return matrixC;
+    public static int[][] randomFillMatrix(final int[][] matrix) {
+        for (int i = 0; i < matrix.length; i++) {
+            for (int j = 0; j < matrix[i].length; j++) {
+                matrix[i][j] = (int)(100 * Math.random());
+            }
+        }
+        return matrix;
     }
 
-    // TODO optimize by https://habrahabr.ru/post/114797/
     public static int[][] singleThreadMultiply(int[][] matrixA, int[][] matrixB) {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
@@ -35,27 +35,111 @@ public class MatrixUtil {
         return matrixC;
     }
 
-    public static int[][] create(int size) {
-        int[][] matrix = new int[size][size];
-        Random rn = new Random();
+    public static int[][] multiThreadsMultiply(final int[][] matrixA, final int[][] matrixB, final int maxThreads, final int way) {
+        final int matrixSize = matrixA.length;
+        final int[][] matrixC = new int[matrixSize][matrixSize];
 
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                matrix[i][j] = rn.nextInt(10);
-            }
+        ExecutorService service = Executors.newFixedThreadPool(maxThreads);
+
+        switch (way) {
+            case 0:
+
+                for (int i = 0; i < matrixSize; i++) {
+                    for (int j = 0; j < matrixSize; j++) {
+                        service.execute(new RowMultiplicator(matrixC, matrixA, matrixB, i, j));
+                    }
+                }
+
+                break;
+
+            case 1:
+
+                for (int i = 0; i < maxThreads; i++) {
+                    service.execute(new RowsMultiplicator(matrixC, matrixA, matrixB, maxThreads, i));
+                }
+
+                break;
+
+            default:
+                break;
         }
-        return matrix;
+
+        service.shutdown();
+
+        while (!service.isTerminated()) {
+
+        }
+
+        return matrixC;
     }
 
-    public static boolean compare(int[][] matrixA, int[][] matrixB) {
-        final int matrixSize = matrixA.length;
-        for (int i = 0; i < matrixSize; i++) {
-            for (int j = 0; j < matrixSize; j++) {
-                if (matrixA[i][j] != matrixB[i][j]) {
-                    return false;
+    private static class RowMultiplicator implements Runnable {
+
+        final int[][] resultMatrix;
+        final int[][] matrixA;
+        final int[][] matrixB;
+        final int row;
+        final int column;
+
+        public RowMultiplicator(final int[][] resultMatrix, final int[][] matrixA, final int[][] matrixB, final int row, final int column) {
+            this.resultMatrix = resultMatrix;
+            this.matrixA = matrixA;
+            this.matrixB = matrixB;
+            this.row = row;
+            this.column = column;
+        }
+
+        @Override
+        public void run() {
+            int sum = 0;
+
+            for (int i = 0; i < matrixA[row].length; i++) {
+                sum += matrixA[row][i] * matrixB[i][column];
+            }
+
+            setElement(resultMatrix, row, column, sum);
+        }
+    }
+
+    private static class RowsMultiplicator implements Runnable {
+
+        final int[][] resultMatrix;
+        final int[][] matrixA;
+        final int[][] matrixB;
+        final int maxThreads;
+        final int threadNumber;
+
+        public RowsMultiplicator(int[][] resultMatrix, int[][] matrixA, int[][] matrixB, int maxThreads, int threadNumber) {
+            this.resultMatrix = resultMatrix;
+            this.matrixA = matrixA;
+            this.matrixB = matrixB;
+            this.maxThreads = maxThreads;
+            this.threadNumber = threadNumber;
+        }
+
+        @Override
+        public void run() {
+            int matrixSize = matrixA.length;
+            int vectorsPerThread = resultMatrix.length / maxThreads;
+            int start = threadNumber * vectorsPerThread;
+            int end = (threadNumber == maxThreads - 1) ? matrixSize : (threadNumber + 1) * vectorsPerThread;
+
+            for (int i = start; i < end; i++) {
+                for (int j = 0; j < matrixSize; j++) {
+                    int sum = 0;
+                    for (int k = 0; k < matrixSize; k++) {
+                        sum += matrixA[i][k] * matrixB[k][j];
+                    }
+                    setElement(resultMatrix, i, j, sum);
                 }
             }
         }
-        return true;
+    }
+
+
+    private static void setElement(final int[][] matrix, final int row, final int column, final int value) {
+        synchronized (LOCK) {
+            matrix[row][column] = value;
+        }
     }
 }
